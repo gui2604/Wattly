@@ -1,0 +1,11 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wattly-api:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./api/.env
+    restart: unless-stopped

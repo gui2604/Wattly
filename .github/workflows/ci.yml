@@ -1,0 +1,126 @@
+name: Wattly CI/CD
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: wattly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  qualidade:
+    name: Qualidade — formato, análise, testes e build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust 1.91.1 com rustfmt e clippy
+        uses: dtolnay/rust-toolchain@1.91.1
+        with:
+          components: rustfmt, clippy
+
+      - name: Reaproveitar dependências compiladas
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+
+      - name: Conferir a formatação
+        run: cargo fmt --all -- --check
+
+      - name: Analisar o código com clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Executar o plano de testes
+        run: cargo test --all-targets --locked -- --nocapture
+
+      - name: Compilar o binário de release
+        run: cargo build --release --locked
+
+      - name: Registrar o resultado no resumo da execução
+        if: always()
+        run: |
+          {
+            echo "## Qualidade"
+            echo ""
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Rust: \`$(rustc --version)\`"
+            echo "- Formatação, clippy, testes e build de release rodam sem o Oracle."
+            echo "- A senha do banco não entra nesta esteira. O teste de ponta com a FIAP fica no \`cargo test -- --ignored\`, na máquina do grupo."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dependencias:
+    name: Segurança — advisory das dependências
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@1.91.1
+
+      - name: Reaproveitar dependências compiladas
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+
+      - name: Instalar cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Auditar crates contra o RustSec
+        id: audit
+        working-directory: api
+        continue-on-error: true
+        run: cargo audit
+
+      - name: Registrar a auditoria no resumo
+        if: always()
+        run: |
+          {
+            echo "## Dependências"
+            echo ""
+            echo "cargo audit encerrou com status \`${{ steps.audit.outcome }}\`."
+            echo "Um advisory conhecido não derruba a entrega, mas precisa aparecer no PDF."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  imagem:
+    name: Docker — construir a imagem
+    needs: qualidade
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Preparar o Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir a imagem sem publicar em registro
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: wattly-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Registrar a imagem no resumo
+        if: always()
+        run: |
+          {
+            echo "## Imagem"
+            echo ""
+            echo "Tag local da execução: \`wattly-api:${{ github.sha }}\`."
+            echo "A imagem não é enviada para um registro. O Oracle Instant Client entra só no runtime, e a senha chega por variável de ambiente."
+          } >> "$GITHUB_STEP_SUMMARY"

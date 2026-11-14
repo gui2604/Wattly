@@ -1,0 +1,12 @@
+# Segredos locais. Nunca versionar.
+.env
+api/.env
+
+# Build
+api/target/
+target/
+
+# Sistema e logs
+*.log
+.DS_Store
+Thumbs.db
