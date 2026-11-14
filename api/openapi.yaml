@@ -1,0 +1,1130 @@
+openapi: 3.0.3
+info:
+  title: Wattly API
+  version: 0.1.0
+  description: |
+    Credenciamento de anfitriões, pontos de recarga e mapa público da Wattly.
+    Rotas protegidas usam `Authorization: Bearer`. O mapa público devolve
+    coordenada arredondada e omite endereço, instrução de acesso e documento completo.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+    description: Ambiente local
+tags:
+  - name: saude
+  - name: autenticacao
+  - name: credenciamento
+  - name: mapa
+paths:
+  /health:
+    get:
+      tags: [saude]
+      summary: Verifica se o processo está no ar
+      operationId: health
+      responses:
+        "200":
+          description: Serviço respondendo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /health/ready:
+    get:
+      tags: [saude]
+      summary: Verifica a conexão com o banco
+      operationId: ready
+      responses:
+        "200":
+          description: Banco acessível
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ready"
+        "500":
+          $ref: "#/components/responses/Database"
+  /openapi.yaml:
+    get:
+      tags: [saude]
+      summary: Contrato OpenAPI desta API
+      operationId: openapi
+      responses:
+        "200":
+          description: Documento OpenAPI 3
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /docs:
+    get:
+      tags: [saude]
+      summary: Interface Swagger UI
+      operationId: docs
+      responses:
+        "200":
+          description: Página HTML
+          content:
+            text/html:
+              schema:
+                type: string
+  /api/v1/auth/register:
+    post:
+      tags: [autenticacao]
+      summary: Cria uma conta e devolve o token
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Conta criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/auth/login:
+    post:
+      tags: [autenticacao]
+      summary: Entra com e-mail e senha
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Sessão iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/me:
+    get:
+      tags: [autenticacao]
+      summary: Devolve a conta do token
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Conta ativa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/users/{id}/status:
+    post:
+      tags: [autenticacao]
+      summary: Ativa ou suspende uma conta
+      description: Somente o papel `admin`. A própria conta administradora não pode ser alterada.
+      operationId: changeUserStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusRequest"
+      responses:
+        "200":
+          description: Conta atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/clients:
+    post:
+      tags: [credenciamento]
+      summary: Abre um dossiê em rascunho
+      operationId: createClient
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientRequest"
+      responses:
+        "201":
+          description: Dossiê criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    get:
+      tags: [credenciamento]
+      summary: Lista os dossiês visíveis para a conta
+      description: O administrador vê todos. Os demais veem os próprios.
+      operationId: listClients
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de dossiês
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clients]
+                properties:
+                  clients:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/clients/{id}:
+    get:
+      tags: [credenciamento]
+      summary: Lê um dossiê
+      operationId: getClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Dossiê
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [credenciamento]
+      summary: Atualiza o dossiê enquanto ele está aberto
+      operationId: updateClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientPatch"
+      responses:
+        "200":
+          description: Dossiê atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/clients/{id}/dossier:
+    get:
+      tags: [credenciamento]
+      summary: Junta dossiê, documentos, checklist, eventos e pontos
+      operationId: getDossier
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Dossiê completo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dossier"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/clients/{id}/documents:
+    post:
+      tags: [credenciamento]
+      summary: Registra a referência de um documento
+      description: Aceito apenas em `draft` ou `rejected`. O envio exige `identity`, `address_proof` e `charger_photo`.
+      operationId: addDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentRequest"
+      responses:
+        "201":
+          description: Documento registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/clients/{id}/submit:
+    post:
+      tags: [credenciamento]
+      summary: Envia o dossiê para revisão
+      description: Exige um ponto e os três documentos. A transição válida é de `draft` para `submitted`.
+      operationId: submitClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Dossiê enviado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/clients/{id}/reopen:
+    post:
+      tags: [credenciamento]
+      summary: Reabre um dossiê recusado
+      description: A transição válida é de `rejected` para `draft`.
+      operationId: reopenClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Dossiê reaberto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/clients/{id}/review:
+    post:
+      tags: [credenciamento]
+      summary: Revisa o credenciamento
+      description: |
+        Somente `admin`. Ações: `start`, `approve`, `reject`, `suspend`, `reactivate`, `revoke`.
+        Aprovar exige o checklist `identity`, `address`, `electrical` e `connector`, todos com `passed: true`.
+        Recusar exige `notes`.
+      operationId: reviewClient
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+      responses:
+        "200":
+          description: Decisão registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/clients/{id}/locations:
+    post:
+      tags: [credenciamento]
+      summary: Cadastra um ponto de recarga
+      operationId: createLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationRequest"
+      responses:
+        "201":
+          description: Ponto criado, com o endereço completo para o dono
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+        "400":
+          $ref: "#/components/responses/Validation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      tags: [credenciamento]
+      summary: Lista os pontos de um dossiê
+      operationId: listClientLocations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Pontos com endereço completo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locations]
+                properties:
+                  locations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Location"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/locations:
+    get:
+      tags: [mapa]
+      summary: Busca pontos aprovados perto de uma coordenada
+      description: Não exige login. A resposta usa coordenada arredondada e não traz rua nem instrução de acesso.
+      operationId: searchLocations
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+        - name: radius_km
+          in: query
+          required: false
+          schema:
+            type: number
+            minimum: 0.1
+            maximum: 50
+            default: 5
+        - name: connector
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/Connector"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Pontos públicos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locations]
+                properties:
+                  locations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Location"
+        "400":
+          $ref: "#/components/responses/Validation"
+  /api/v1/locations/{id}:
+    get:
+      tags: [mapa]
+      summary: Lê um ponto
+      description: |
+        Sem token, ou com token de outra pessoa, só um ponto aprovado e ativo é visível, com coordenada arredondada.
+        O dono e o administrador recebem a coordenada exata e o endereço.
+      operationId: getLocation
+      parameters:
+        - $ref: "#/components/parameters/LocationId"
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ponto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ClientId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LocationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Validation:
+      description: Campo inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    Unauthorized:
+      description: Token ausente ou credencial inválida
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Conta sem permissão ou suspensa
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Recurso inexistente ou oculto
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflito de unicidade ou transição de status
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Database:
+      description: Falha ao acessar o banco
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: wattly-api
+    Ready:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          example: ok
+        database:
+          type: string
+          example: ok
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [unauthorized, forbidden, not_found, conflict, database, internal]
+        message:
+          type: string
+    ValidationError:
+      type: object
+      required: [error, message, fields]
+      properties:
+        error:
+          type: string
+          enum: [validation]
+        message:
+          type: string
+        fields:
+          type: array
+          items:
+            type: object
+            required: [field, detail]
+            properties:
+              field:
+                type: string
+              detail:
+                type: string
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name, phone, document, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: Precisa de letra e número.
+        full_name:
+          type: string
+          minLength: 3
+          maxLength: 160
+        phone:
+          type: string
+          description: Telefone com DDD, de 10 a 13 dígitos.
+        document:
+          type: string
+          description: CPF válido, com ou sem máscara.
+        role:
+          type: string
+          enum: [driver, host, both]
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    Session:
+      type: object
+      required: [token_type, expires_in_hours, token, user]
+      properties:
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in_hours:
+          type: integer
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+    User:
+      type: object
+      required: [id, email, full_name, phone, document_masked, role, status, terms_version, consent_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        full_name:
+          type: string
+        phone:
+          type: string
+        document_masked:
+          type: string
+          example: "***.***.***-25"
+        role:
+          type: string
+          enum: [driver, host, both, admin]
+        status:
+          type: string
+          enum: [active, suspended]
+        terms_version:
+          type: string
+        consent_at:
+          type: string
+        created_at:
+          type: string
+    UserStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, suspended]
+    ClientRequest:
+      type: object
+      required: [trade_name, person_type, tax_id, pix_key_type, pix_key]
+      properties:
+        trade_name:
+          type: string
+          minLength: 2
+          maxLength: 160
+        legal_name:
+          type: string
+          maxLength: 180
+        person_type:
+          type: string
+          enum: [individual, mei, company]
+        tax_id:
+          type: string
+          description: CPF para individual e mei. CNPJ para company.
+        pix_key_type:
+          type: string
+          enum: [email, cpf, cnpj, phone, random]
+        pix_key:
+          type: string
+          maxLength: 180
+        bio:
+          type: string
+          maxLength: 1000
+    ClientPatch:
+      type: object
+      properties:
+        trade_name:
+          type: string
+        legal_name:
+          type: string
+        bio:
+          type: string
+        pix_key_type:
+          type: string
+          enum: [email, cpf, cnpj, phone, random]
+        pix_key:
+          type: string
+    Client:
+      type: object
+      required: [id, owner_id, trade_name, person_type, tax_id_masked, pix_key_type, pix_key_masked, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        trade_name:
+          type: string
+        legal_name:
+          type: string
+        person_type:
+          type: string
+          enum: [individual, mei, company]
+        tax_id_masked:
+          type: string
+        tax_id:
+          type: string
+          nullable: true
+          description: Presente para o dono e para o administrador.
+        pix_key_type:
+          type: string
+        pix_key_masked:
+          type: string
+        pix_key:
+          type: string
+          nullable: true
+        bio:
+          type: string
+        status:
+          type: string
+          enum: [draft, submitted, under_review, approved, rejected, suspended, revoked]
+        reject_reason:
+          type: string
+          nullable: true
+        decision_note:
+          type: string
+          nullable: true
+        submitted_at:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          nullable: true
+        reviewer_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+    DocumentRequest:
+      type: object
+      required: [kind, storage_ref]
+      properties:
+        kind:
+          type: string
+          enum: [identity, address_proof, charger_photo, electrical_safety]
+        storage_ref:
+          type: string
+          maxLength: 300
+        note:
+          type: string
+          maxLength: 300
+    Document:
+      type: object
+      required: [id, client_id, kind, storage_ref, status, created_at]
+      properties:
+        id:
+          type: string
+        client_id:
+          type: string
+        kind:
+          type: string
+        storage_ref:
+          type: string
+        status:
+          type: string
+          example: received
+        note:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+    ReviewRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [start, approve, reject, suspend, reactivate, revoke]
+        notes:
+          type: string
+        checks:
+          type: array
+          items:
+            type: object
+            required: [item, passed]
+            properties:
+              item:
+                type: string
+                enum: [identity, address, electrical, connector]
+              passed:
+                type: boolean
+              note:
+                type: string
+                nullable: true
+    Check:
+      type: object
+      properties:
+        id:
+          type: string
+        client_id:
+          type: string
+        item:
+          type: string
+        passed:
+          type: boolean
+        note:
+          type: string
+          nullable: true
+        reviewer_id:
+          type: string
+        created_at:
+          type: string
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        client_id:
+          type: string
+        actor_id:
+          type: string
+        event_type:
+          type: string
+        from_status:
+          type: string
+        to_status:
+          type: string
+        payload:
+          type: string
+        created_at:
+          type: string
+    Window:
+      type: object
+      required: [weekday, start, end]
+      properties:
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 é domingo e 6 é sábado.
+        start:
+          type: string
+          example: "08:00"
+        end:
+          type: string
+          example: "18:00"
+    Connector:
+      type: string
+      enum: [home_outlet_220v, wallbox_type2, wallbox_ccs2]
+    LocationRequest:
+      type: object
+      required:
+        - label
+        - address_line
+        - address_number
+        - district
+        - city
+        - state
+        - postal_code
+        - latitude
+        - longitude
+        - connector
+        - power_kw
+        - voltage
+        - phases
+        - price_per_minute_cents
+        - price_per_hour_cents
+        - install_type
+        - has_roof
+        - well_lit
+        - windows
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        address_line:
+          type: string
+        address_number:
+          type: string
+        complement:
+          type: string
+        district:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+          minLength: 2
+          maxLength: 2
+          example: SP
+        postal_code:
+          type: string
+          description: CEP com 8 dígitos.
+        country:
+          type: string
+          default: BR
+        latitude:
+          type: number
+        longitude:
+          type: number
+        connector:
+          $ref: "#/components/schemas/Connector"
+        power_kw:
+          type: number
+          minimum: 0.5
+          maximum: 350
+        voltage:
+          type: integer
+          enum: [110, 127, 220, 380]
+        phases:
+          type: integer
+          enum: [1, 3]
+        price_per_minute_cents:
+          type: integer
+          minimum: 1
+        price_per_hour_cents:
+          type: integer
+          minimum: 1
+        install_type:
+          type: string
+          enum: [home_outlet, wallbox, shared_garage]
+        has_roof:
+          type: boolean
+        well_lit:
+          type: boolean
+        access_note:
+          type: string
+        spot_code:
+          type: string
+        windows:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Window"
+    Location:
+      type: object
+      required: [id, client_id, label, district, city, state, latitude, longitude, approximate, connector, status, windows]
+      properties:
+        id:
+          type: string
+        client_id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        district:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        approximate:
+          type: boolean
+          description: Verdadeiro quando a coordenada foi arredondada para o mapa público.
+        connector:
+          $ref: "#/components/schemas/Connector"
+        power_kw:
+          type: number
+        voltage:
+          type: integer
+        phases:
+          type: integer
+        price_per_minute_cents:
+          type: integer
+        price_per_hour_cents:
+          type: integer
+        install_type:
+          type: string
+        has_roof:
+          type: boolean
+        well_lit:
+          type: boolean
+        status:
+          type: string
+        windows:
+          type: array
+          items:
+            $ref: "#/components/schemas/Window"
+        address_line:
+          type: string
+          nullable: true
+        address_number:
+          type: string
+          nullable: true
+        complement:
+          type: string
+          nullable: true
+        postal_code:
+          type: string
+          nullable: true
+        access_note:
+          type: string
+          nullable: true
+        spot_code:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+    Dossier:
+      type: object
+      required: [client, documents, checks, events, locations]
+      properties:
+        client:
+          $ref: "#/components/schemas/Client"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Check"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"

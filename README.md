@@ -15,7 +15,7 @@ copy .env.example .env
 cargo run
 ```
 
-A API escuta em `http://localhost:8080`.
+A API escuta em `http://localhost:8080`. O contrato OpenAPI fica em `http://localhost:8080/openapi.yaml` e a interface em `http://localhost:8080/docs`. O arquivo versionado é `api/openapi.yaml`.
 
 Nesta máquina o Rust padrão procura o linker do Visual Studio, que não está instalado. O compilador GNU já está disponível. Num terminal novo:
 

@@ -11,7 +11,7 @@ RUN dnf -y install oracle-instantclient-release-el8 \
 
 FROM rust:1.91.1-bookworm AS builder
 WORKDIR /src
-COPY api/Cargo.toml api/Cargo.lock ./
+COPY api/Cargo.toml api/Cargo.lock api/openapi.yaml ./
 COPY api/src ./src
 RUN cargo build --release --locked
 

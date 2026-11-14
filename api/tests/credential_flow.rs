@@ -48,6 +48,22 @@ fn bearer(token: &str) -> (&'static str, String) {
 }
 
 #[actix_web::test]
+async fn openapi_lista_o_contrato() {
+    let app = service(AppState::memory(SECRET)).await;
+    let response =
+        test::call_service(&app, TestRequest::get().uri("/openapi.yaml").to_request()).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = test::read_body(response).await;
+    let text = std::str::from_utf8(&body).unwrap();
+    assert!(text.contains("openapi: 3.0.3"));
+    assert!(text.contains("/api/v1/auth/register"));
+    assert!(text.contains("/api/v1/locations"));
+
+    let docs = test::call_service(&app, TestRequest::get().uri("/docs").to_request()).await;
+    assert_eq!(docs.status(), StatusCode::OK);
+}
+
+#[actix_web::test]
 async fn health_responde_ok() {
     let app = service(AppState::memory(SECRET)).await;
     let (status, body) = call(&app, TestRequest::get().uri("/health").to_request()).await;
